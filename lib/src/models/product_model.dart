@@ -20,7 +20,7 @@ class ProductoModel {
 
   String? id;
   String? titulo;
-  double? valor;
+  num valor;
   bool disponible;
   String? fotoUrl;
 

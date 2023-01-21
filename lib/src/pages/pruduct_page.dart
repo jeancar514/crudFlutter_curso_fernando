@@ -1,6 +1,7 @@
-//import 'dart:io';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:formvalidation/src/providers/productos_provider.dart';
+import 'package:formvalidation/src/bloc/provider.dart';
 import 'package:formvalidation/src/utils/utils.dart' as utils;
 import 'package:image_picker/image_picker.dart';
 import '../models/product_model.dart';
@@ -15,13 +16,14 @@ class ProductPage extends StatefulWidget {
 class _ProductPageState extends State<ProductPage> {
   final formKey = GlobalKey<FormState>();
   final scaffoldKey = GlobalKey<ScaffoldState>();
-  ProductosProvider productoProvider = new ProductosProvider();
+  ProductosBloc? productosBloc;
   ProductoModel producto = new ProductoModel();
   bool _guardando = false;
   XFile? image;
 
   @override
   Widget build(BuildContext context) {
+    productosBloc = Provider.productosBloc(context);
     final ProductoModel? prodData =
         ModalRoute.of(context)?.settings.arguments as ProductoModel?;
     if (prodData != null) {
@@ -124,7 +126,9 @@ class _ProductPageState extends State<ProductPage> {
   }
 
   void _submit() async {
+    print("hola");
     bool? valide = formKey.currentState?.validate();
+    print('validate ${valide}');
     if (valide == null) return;
     if (!valide) return;
 
@@ -133,16 +137,15 @@ class _ProductPageState extends State<ProductPage> {
     setState(() {
       _guardando = true;
     });
-
     if (image != null) {
-      print(image);
-      producto.fotoUrl = await productoProvider.subirImage(image!);
+      // ignore: await_only_futures
+      producto.fotoUrl = await productosBloc?.subirFoto(image);
     }
 
     if (producto.id == null) {
-      productoProvider.crearProducto(producto);
+      productosBloc?.agregarProducto(producto);
     } else {
-      productoProvider.editarProducto(producto.id, producto);
+      productosBloc?.editarProducto(producto);
     }
     mostrarSnackbar('Registro guardado');
     Navigator.pop(context);
@@ -170,27 +173,32 @@ class _ProductPageState extends State<ProductPage> {
   Widget _mostrarFoto() {
     // TODO: tengo que hecer esto
     if (producto.fotoUrl != null) {
-      return Container();
+      return FadeInImage(
+        placeholder: AssetImage('assets/jar-loading.gif'),
+        image: imagenNetwork(producto.fotoUrl),
+      );
     } else {
-      print('direccion de la foto');
-      ImageProvider pathImage(String fotoPath) {
-        print(fotoPath);
-        if (fotoPath != 'assets/no-image.png') {
-          String path = 'assets/${fotoPath}';
-          //String path = 'assets/no-image.png';
-          print(path);
-          return AssetImage(path);
-        } else {
-          return AssetImage(fotoPath);
-        }
-      }
-
       return Image(
-        image: pathImage(image?.name ?? 'hola.png'),
+        image: obtenerImage(image?.path ?? 'assets/no-image.png'),
         height: 300.0,
         fit: BoxFit.cover,
       );
     }
+  }
+
+  imagenNetwork(imagenUrl) {
+    if (imagenUrl == null) {
+      return AssetImage('assets/no-image.png');
+    } else {
+      return NetworkImage(imagenUrl);
+    }
+  }
+
+  obtenerImage(imagePath) {
+    print(imagePath);
+    return (imagePath == 'assets/no-image.png')
+        ? AssetImage(imagePath)
+        : FileImage(File(image?.path ?? 'assets/no-image.png'));
   }
 
   Future _seleccionarFoto() async {
@@ -203,7 +211,10 @@ class _ProductPageState extends State<ProductPage> {
 
   _procesarImagen(ImageSource tipo) async {
     image = await ImagePicker().pickImage(source: tipo);
-    if (image != null) {}
+    if (image != null) {
+      //limpieza
+      producto.fotoUrl = null;
+    }
     setState(() {});
   }
 }

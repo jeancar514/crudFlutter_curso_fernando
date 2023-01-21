@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:formvalidation/src/bloc/login_bloc.dart';
+import 'package:formvalidation/src/bloc/provider.dart';
 import 'package:formvalidation/src/models/product_model.dart';
-import 'package:formvalidation/src/providers/productos_provider.dart';
-
-import '../bloc/provider.dart';
 
 class HomePage extends StatelessWidget {
-  final productosProvider = ProductosProvider();
-
   HomePage({super.key});
+
   @override
   Widget build(BuildContext context) {
-    LoginBloc bloc = Provider.of(context);
+    final productosBloc = Provider.productosBloc(context);
+    productosBloc.cargarProductos();
 
     return Scaffold(
       appBar: AppBar(
@@ -19,14 +16,16 @@ class HomePage extends StatelessWidget {
         actions: [],
         title: Text('Home'),
       ),
-      body: _crearListado(),
+      body: _crearListado(productosBloc),
       floatingActionButton: _crearBoton(context),
     );
   }
 
-  Widget _crearListado() {
-    return FutureBuilder(
-      future: productosProvider.cargarProductos(),
+  Widget _crearListado(ProductosBloc productosBloc) {
+    print("home crear listado");
+
+    return StreamBuilder(
+      stream: productosBloc.productosStream,
       builder:
           (BuildContext context, AsyncSnapshot<List<ProductoModel>> snapshot) {
         if (snapshot.hasData) {
@@ -34,7 +33,7 @@ class HomePage extends StatelessWidget {
           return ListView.builder(
             itemCount: productos?.length,
             itemBuilder: (BuildContext context, int index) =>
-                _crearItem(productos![index], context),
+                _crearItem(productos![index], context, productosBloc),
           );
         } else {
           return Center(
@@ -45,7 +44,8 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _crearItem(ProductoModel producto, BuildContext context) {
+  Widget _crearItem(ProductoModel producto, BuildContext context,
+      ProductosBloc produuctosBloc) {
     return Dismissible(
       key: UniqueKey(),
       background: Container(
@@ -53,16 +53,40 @@ class HomePage extends StatelessWidget {
       ),
       onDismissed: (direccion) {
         //borrar producto
-        String? productoId = (producto.id == null) ? "" : producto.id;
-        productosProvider.borrarProducto(productoId);
+        String productoId = producto.id ?? "";
+        //productosProvider.borrarProducto(productoId);
+        produuctosBloc.borrarProducto(productoId);
       },
-      child: ListTile(
-        title: Text('${producto.titulo} - ${producto.valor}'),
-        subtitle: Text('${producto.id}'),
-        onTap: () =>
-            Navigator.pushNamed(context, 'producto', arguments: producto),
+      child: Card(
+        child: Column(
+          children: <Widget>[
+            (producto.fotoUrl == null)
+                ? Image(image: AssetImage('assets/no-image.png'))
+                : FadeInImage(
+                    placeholder: AssetImage('assets/jar-loading.gif'),
+                    image: imagenNetwork(producto.fotoUrl),
+                    height: 300.0,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+            ListTile(
+              title: Text('${producto.titulo} - ${producto.valor}'),
+              subtitle: Text('${producto.id}'),
+              onTap: () =>
+                  Navigator.pushNamed(context, 'producto', arguments: producto),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  imagenNetwork(imagenUrl) {
+    if (imagenUrl == null) {
+      return AssetImage('assets/no-image.png');
+    } else {
+      return NetworkImage(imagenUrl);
+    }
   }
 
   _crearBoton(BuildContext context) {
